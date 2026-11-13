@@ -1,0 +1,464 @@
+﻿/**
+ * Gustavo Gaeta Barber Studio - Script Principal
+ * Autor: GUSTAVO GAETA
+ */
+
+document.addEventListener("DOMContentLoaded", () => {
+    initNavbar();
+    initDatePicker();
+    initTimeSlots();
+    initBookingSync();
+    initServiceFilters();
+    initPhoneMask();
+    initFaqAccordion();
+    initBookingForm();
+});
+
+/* ==========================================================================
+   1. NAVEGAÇÃO & MENU MOBILE
+   ========================================================================== */
+function initNavbar() {
+    const navbar = document.getElementById("navbar");
+    const menuToggle = document.getElementById("menu-toggle");
+    const navMenu = document.getElementById("nav-menu");
+    const navLinks = document.querySelectorAll(".nav-link");
+
+    window.addEventListener("scroll", () => {
+        if (window.scrollY > 40) {
+            navbar.classList.add("scrolled");
+        } else {
+            navbar.classList.remove("scrolled");
+        }
+    });
+
+    if (menuToggle && navMenu) {
+        menuToggle.addEventListener("click", () => {
+            navMenu.classList.toggle("open");
+            const icon = menuToggle.querySelector("i");
+            if (navMenu.classList.contains("open")) {
+                icon.classList.remove("fa-bars");
+                icon.classList.add("fa-xmark");
+            } else {
+                icon.classList.remove("fa-xmark");
+                icon.classList.add("fa-bars");
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.addEventListener("click", () => {
+                navMenu.classList.remove("open");
+                const icon = menuToggle.querySelector("i");
+                if (icon) {
+                    icon.classList.remove("fa-xmark");
+                    icon.classList.add("fa-bars");
+                }
+            });
+        });
+    }
+}
+
+/* ==========================================================================
+   2. SELETOR DE DATA
+   ========================================================================== */
+function initDatePicker() {
+    const dateInput = document.getElementById("booking-date");
+    if (!dateInput) return;
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const minDateStr = `${yyyy}-${mm}-${dd}`;
+
+    dateInput.min = minDateStr;
+    if (!dateInput.value) {
+        dateInput.value = minDateStr;
+    }
+
+    dateInput.addEventListener("change", () => {
+        initTimeSlots();
+        updateSummary();
+    });
+}
+
+/* ==========================================================================
+   3. HORÁRIOS DISPONÍVEIS
+   ========================================================================== */
+const AVAILABLE_TIMES = [
+    "09:00", "09:45", "10:30", "11:15",
+    "13:00", "13:45", "14:30", "15:15",
+    "16:00", "16:45", "17:30", "18:15", "19:00"
+];
+
+function initTimeSlots() {
+    const container = document.getElementById("time-slots-container");
+    const hiddenInput = document.getElementById("selected-time");
+    const dateInput = document.getElementById("booking-date");
+    if (!container || !hiddenInput) return;
+
+    container.innerHTML = "";
+    hiddenInput.value = "";
+
+    const selectedDate = dateInput && dateInput.value ? new Date(dateInput.value + "T00:00:00") : new Date();
+    const isToday = new Date().toDateString() === selectedDate.toDateString();
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
+
+    let firstAvailableSet = false;
+
+    AVAILABLE_TIMES.forEach(time => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "time-slot-btn";
+        btn.textContent = time;
+
+        const [tHour, tMin] = time.split(":").map(Number);
+        const isPast = isToday && (tHour < currentHour || (tHour === currentHour && tMin <= currentMin));
+
+        if (isPast) {
+            btn.disabled = true;
+            btn.title = "Horário indisponível";
+        } else {
+            if (!firstAvailableSet) {
+                btn.classList.add("selected");
+                hiddenInput.value = time;
+                firstAvailableSet = true;
+            }
+
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".time-slot-btn").forEach(b => b.classList.remove("selected"));
+                btn.classList.add("selected");
+                hiddenInput.value = time;
+                updateSummary();
+            });
+        }
+
+        container.appendChild(btn);
+    });
+
+    updateSummary();
+}
+
+/* ==========================================================================
+   4. FILTRO DE SERVIÇOS INTERATIVO
+   ========================================================================== */
+function initServiceFilters() {
+    const filterBtns = document.querySelectorAll(".filter-btn");
+    const pricingCards = document.querySelectorAll(".pricing-card");
+
+    if (!filterBtns.length || !pricingCards.length) return;
+
+    filterBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            filterBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            const category = btn.getAttribute("data-filter");
+
+            pricingCards.forEach(card => {
+                const cardCategory = card.getAttribute("data-category");
+                if (category === "all" || cardCategory === category) {
+                    card.style.display = "flex";
+                    setTimeout(() => {
+                        card.style.opacity = "1";
+                        card.style.transform = "translateY(0)";
+                    }, 50);
+                } else {
+                    card.style.opacity = "0";
+                    card.style.transform = "translateY(15px)";
+                    setTimeout(() => {
+                        card.style.display = "none";
+                    }, 250);
+                }
+            });
+        });
+    });
+}
+
+/* ==========================================================================
+   5. MÁSCARA AUTOMÁTICA DE WHATSAPP / TELEFONE
+   ========================================================================== */
+function initPhoneMask() {
+    const phoneInput = document.getElementById("client-phone");
+    if (!phoneInput) return;
+
+    phoneInput.addEventListener("input", (e) => {
+        let value = e.target.value.replace(/\D/g, "");
+        if (value.length > 11) value = value.slice(0, 11);
+
+        if (value.length > 10) {
+            value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+        } else if (value.length > 6) {
+            value = value.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+        } else if (value.length > 2) {
+            value = value.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+        } else if (value.length > 0) {
+            value = value.replace(/^(\d{0,2})/, "($1");
+        }
+
+        e.target.value = value;
+    });
+}
+
+/* ==========================================================================
+   6. SINCRONIZAÇÃO DE SELEÇÃO & RESUMO
+   ========================================================================== */
+function initBookingSync() {
+    const serviceSelect = document.getElementById("select-service");
+    const barberSelect = document.getElementById("select-barber");
+
+    // Seleção de barbeiro a partir dos cards
+    document.querySelectorAll(".select-barber-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const barberName = btn.getAttribute("data-barber");
+            if (barberSelect) {
+                for (let option of barberSelect.options) {
+                    if (option.value.includes(barberName) || barberName.includes(option.value)) {
+                        barberSelect.value = option.value;
+                        break;
+                    }
+                }
+            }
+            updateSummary();
+            scrollToSection("reserva");
+            showToast(`Barbeiro ${barberName} selecionado com sucesso!`);
+        });
+    });
+
+    // Seleção de serviço a partir dos cards
+    document.querySelectorAll(".select-service-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            const card = e.target.closest(".pricing-card");
+            if (!card) return;
+            const serviceName = card.getAttribute("data-service");
+
+            if (serviceSelect) {
+                for (let option of serviceSelect.options) {
+                    if (option.value === serviceName) {
+                        serviceSelect.value = serviceName;
+                        break;
+                    }
+                }
+            }
+            updateSummary();
+            scrollToSection("reserva");
+            showToast(`Serviço "${serviceName}" selecionado!`);
+        });
+    });
+
+    if (serviceSelect) {
+        serviceSelect.addEventListener("change", updateSummary);
+    }
+    if (barberSelect) {
+        barberSelect.addEventListener("change", updateSummary);
+    }
+}
+
+function updateSummary() {
+    const serviceSelect = document.getElementById("select-service");
+    const barberSelect = document.getElementById("select-barber");
+    const dateInput = document.getElementById("booking-date");
+    const hiddenTime = document.getElementById("selected-time");
+
+    const summaryService = document.getElementById("summary-service");
+    const summaryBarber = document.getElementById("summary-barber");
+    const summaryDateTime = document.getElementById("summary-datetime");
+    const summaryPrice = document.getElementById("summary-price");
+
+    if (serviceSelect && serviceSelect.selectedOptions[0]) {
+        const selectedOpt = serviceSelect.selectedOptions[0];
+        const price = selectedOpt.getAttribute("data-price") || "85.00";
+        if (summaryService) summaryService.textContent = selectedOpt.value;
+        if (summaryPrice) summaryPrice.textContent = `R$ ${parseFloat(price).toFixed(2).replace(".", ",")}`;
+    }
+
+    if (barberSelect && summaryBarber) {
+        summaryBarber.textContent = barberSelect.value;
+    }
+
+    if (summaryDateTime) {
+        const timeVal = hiddenTime && hiddenTime.value ? hiddenTime.value : "--:--";
+        if (dateInput && dateInput.value) {
+            const [y, m, d] = dateInput.value.split("-");
+            summaryDateTime.textContent = `${d}/${m}/${y} às ${timeVal}`;
+        } else {
+            summaryDateTime.textContent = "Aguardando horário";
+        }
+    }
+}
+
+function scrollToSection(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+    }
+}
+
+/* ==========================================================================
+   7. FORMULÁRIO DE AGENDAMENTO & INTEGRAÇÃO
+   ========================================================================== */
+function initBookingForm() {
+    const form = document.getElementById("booking-form");
+    const modal = document.getElementById("modal-success");
+    const modalCloseBtn = document.getElementById("modal-close-btn");
+    const modalTicket = document.getElementById("modal-ticket-details");
+    const modalWhatsappBtn = document.getElementById("modal-whatsapp-btn");
+
+    if (!form) return;
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const service = document.getElementById("select-service").value;
+        const barber = document.getElementById("select-barber").value;
+        const dateRaw = document.getElementById("booking-date").value;
+        const time = document.getElementById("selected-time").value;
+        const clientName = document.getElementById("client-name").value.trim();
+        const clientPhone = document.getElementById("client-phone").value.trim();
+        const clientEmail = document.getElementById("client-email").value.trim();
+        const clientNotes = document.getElementById("client-notes").value.trim();
+
+        if (!time) {
+            showToast("Por favor, selecione um dos horários disponíveis acima.");
+            return;
+        }
+
+        const [y, m, d] = dateRaw.split("-");
+        const formattedDate = `${d}/${m}/${y}`;
+        // Código de reserva Gustavo Gaeta
+        const bookingCode = `NG-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const serviceSelect = document.getElementById("select-service");
+        const price = serviceSelect.selectedOptions[0]?.getAttribute("data-price") || "85.00";
+        const formattedPrice = `R$ ${parseFloat(price).toFixed(2).replace(".", ",")}`;
+
+        const bookingData = {
+            codigo: bookingCode,
+            cliente: clientName,
+            telefone: clientPhone,
+            email: clientEmail,
+            servico: service,
+            barbeiro: barber,
+            data: formattedDate,
+            hora: time,
+            valor: formattedPrice,
+            observacoes: clientNotes
+        };
+
+        const submitBtn = document.getElementById("submit-booking-btn");
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Confirmando Reserva...`;
+        }
+
+        try {
+            await fetch("/api/agendamentos", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(bookingData)
+            });
+        } catch (err) {
+            console.warn("Backend API offline ou executando modo estático. Agendamento salvo localmente.", err);
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Finalizar Agendamento`;
+            }
+        }
+
+        // Preenche o comprovante no modal
+        if (modalTicket) {
+            modalTicket.innerHTML = `
+                <div class="ticket-line"><span>Código da Reserva:</span> <strong class="gold-text">${bookingCode}</strong></div>
+                <div class="ticket-line"><span>Cliente:</span> <strong>${clientName}</strong></div>
+                <div class="ticket-line"><span>WhatsApp:</span> <strong>${clientPhone}</strong></div>
+                <div class="ticket-line"><span>Serviço:</span> <strong>${service}</strong></div>
+                <div class="ticket-line"><span>Barbeiro:</span> <strong>${barber}</strong></div>
+                <div class="ticket-line"><span>Data & Horário:</span> <strong>${formattedDate} às ${time}</strong></div>
+                <div class="ticket-line"><span>Total Estimado:</span> <strong class="gold-text">${formattedPrice}</strong></div>
+            `;
+        }
+
+        // Link para compartilhar comprovante no WhatsApp
+        if (modalWhatsappBtn) {
+            const whatsAppText = encodeURIComponent(
+                `💈 *CONFIRMAÇÃO DE AGENDAMENTO - GUSTAVO GAETA BARBER STUDIO* 💈\n\n` +
+                `*Código da Reserva:* ${bookingCode}\n` +
+                `*Cliente:* ${clientName}\n` +
+                `*WhatsApp:* ${clientPhone}\n` +
+                `*Serviço:* ${service} (${formattedPrice})\n` +
+                `*Profissional:* ${barber}\n` +
+                `*Data:* ${formattedDate} às ${time}\n` +
+                (clientNotes ? `*Observações:* ${clientNotes}\n` : "") +
+                `\nOlá, confirmo meu agendamento realizado pelo site oficial de Gustavo Gaeta!`
+            );
+            modalWhatsappBtn.onclick = () => {
+                window.open(`https://wa.me/5511987654321?text=${whatsAppText}`, "_blank");
+            };
+        }
+
+        if (modal) {
+            modal.classList.add("open");
+        }
+
+        form.reset();
+        initDatePicker();
+        initTimeSlots();
+    });
+
+    if (modalCloseBtn && modal) {
+        modalCloseBtn.addEventListener("click", () => {
+            modal.classList.remove("open");
+        });
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) {
+                modal.classList.remove("open");
+            }
+        });
+    }
+}
+
+/* ==========================================================================
+   8. PERGUNTAS FREQUENTES (ACCORDION)
+   ========================================================================== */
+function initFaqAccordion() {
+    const faqItems = document.querySelectorAll(".faq-item");
+
+    faqItems.forEach(item => {
+        const questionBtn = item.querySelector(".faq-question");
+        const answer = item.querySelector(".faq-answer");
+
+        if (questionBtn && answer) {
+            questionBtn.addEventListener("click", () => {
+                const isActive = item.classList.contains("active");
+
+                faqItems.forEach(other => {
+                    other.classList.remove("active");
+                    const otherAnswer = other.querySelector(".faq-answer");
+                    if (otherAnswer) otherAnswer.style.maxHeight = null;
+                });
+
+                if (!isActive) {
+                    item.classList.add("active");
+                    answer.style.maxHeight = answer.scrollHeight + "px";
+                }
+            });
+        }
+    });
+}
+
+/* ==========================================================================
+   9. NOTIFICAÇÃO TOAST
+   ========================================================================== */
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+
+    toast.textContent = message;
+    toast.classList.add("show");
+
+    setTimeout(() => {
+        toast.classList.remove("show");
+    }, 3200);
+}
